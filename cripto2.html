@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculadora de Lucro de Criptomoeda</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .calculator {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+        }
+        label {
+            color: #666;
+        }
+        .result {
+            font-weight: bold;
+        }
+        .gain {
+            color: green;
+        }
+        .loss {
+            color: red;
+        }
+    </style>
+    <script>
+        async function fetchCryptos() {
+            const response = await fetch('https://api.binance.com/api/v3/exchangeInfo');
+            const data = await response.json();
+            const criptomoedas = data.symbols.filter(symbol => symbol.quoteAsset === 'USDT');
+            populateCryptoOptions(criptomoedas);
+        }
+
+        function populateCryptoOptions(criptomoedas) {
+            const select = document.getElementById("cryptoSymbol");
+            criptomoedas.forEach(crip => {
+                const option = document.createElement("option");
+                option.value = crip.symbol;
+                option.text = `${crip.baseAsset} (${crip.symbol})`;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', () => fetchPrice(select.value));
+        }
+
+        async function fetchPrice(symbol) {
+            const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+            const data = await response.json();
+            document.getElementById('currentPrice').innerText = "Preço Atual: $" + data.price;
+            return parseFloat(data.price);
+        }
+
+        async function calcularLucro() {
+            var valorCompra = parseFloat(document.getElementById("valorCompra").value);
+            var valorVenda = parseFloat(document.getElementById("valorVenda").value);
+            var valorAporte = parseFloat(document.getElementById("valorAporte").value);
+            var symbol = document.getElementById("cryptoSymbol").value;
+
+            if (isNaN(valorCompra)) {
+                valorCompra = await fetchPrice(symbol);
+            }
+            if (isNaN(valorVenda) || isNaN(valorAporte)) {
+                alert("Por favor, insira valores válidos.");
+                return;
+            }
+
+            var porcentagemLucro = ((valorVenda - valorCompra) / valorCompra) * 100;
+            var valorLucro = (valorVenda - valorCompra) * valorAporte / valorCompra;
+
+            var resultadoPorcentagem = document.getElementById("resultadoPorcentagem");
+            var resultadoValor = document.getElementById("resultadoValor");
+
+            if (porcentagemLucro >= 0) {
+                resultadoPorcentagem.className = "result gain";
+            } else {
+                resultadoPorcentagem.className = "result loss";
+            }
+
+            resultadoPorcentagem.innerText = "Porcentagem de Lucro: " + porcentagemLucro.toFixed(20) + "%";
+            resultadoValor.innerText = "Valor do Lucro: $" + valorLucro.toFixed(20);
+
+            // Plotando o gráfico
+            var ctx = document.getElementById('lucroChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Compra', 'Venda'],
+                    datasets: [{
+                        label: 'Preço da Criptomoeda',
+                        data: [valorCompra, valorVenda],
+                        borderColor: porcentagemLucro >= 0 ? 'green' : 'red',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function setAlert() {
+            var alertPrice = parseFloat(document.getElementById("alertPrice").value);
+            var symbol = document.getElementById("cryptoSymbol").value;
+            var checkPriceInterval = setInterval(async () => {
+                var currentPrice = await fetchPrice(symbol);
+                if (currentPrice >= alertPrice) {
+                    alert("O preço atual atingiu $" + currentPrice.toFixed(20));
+                    clearInterval(checkPriceInterval);
+                }
+            }, 10000); // Checa o preço a cada 10 segundos
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchCryptos);
+    </script>
+</head>
+<body>
+    <div class="calculator">
+        <h2>Calculadora de Lucro de Criptomoeda</h2>
+        <p id="currentPrice">Preço Atual: $...</p>
+
+        <label for="cryptoSymbol">Escolha a Criptomoeda:</label>
+        <select id="cryptoSymbol"></select><br><br>
+
+        <label for="valorCompra">Valor de Compra ($):</label>
+        <input type="text" id="valorCompra" placeholder="Deixe em branco para preço atual"><br><br>
+
+        <label for="valorVenda">Valor de Venda ($):</label>
+        <input type="text" id="valorVenda"><br><br>
+
+        <label for="valorAporte">Valor do Aporte ($):</label>
+        <input type="text" id="valorAporte"><br><br>
+
+        <button onclick="calcularLucro()">Calcular Lucro</button>
+
+        <h3 id="resultadoPorcentagem"></h3>
+        <h3 id="resultadoValor"></h3>
+
+        <label for="alertPrice">Definir Alerta de Preço ($):</label>
+        <input type="text" id="alertPrice">
+        <button onclick="setAlert()">Set Alerta</button>
+
+        <canvas id="lucroChart"></canvas>
+    </div>
+</body>
+</html>
